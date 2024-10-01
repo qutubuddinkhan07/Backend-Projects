@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dynamic SQL Generator</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            padding: 0;
+        }
+        label, input, select {
+            display: block;
+            margin-bottom: 10px;
+        }
+        .field, .value-section {
+            margin-bottom: 20px;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .section-box {
+            background-color: #f4f4f4;
+            border: 1px solid #ddd;
+            padding: 20px;
+            margin-top: 20px;
+            height: 40vh; /* Set height to 40% of the viewport height */
+            overflow-y: auto; /* Enable vertical scrolling */
+        }
+        .sql-box {
+            background-color: #f4f4f4;
+            border: 1px solid #ddd;
+            padding: 10px;
+            margin-top: 20px;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            font-family: monospace;
+            position: relative;
+            overflow-x: auto;
+        }
+        .copy-button {
+            position: absolute;
+            right: 10px;
+            top: 10px;
+            background-color: #007BFF;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            cursor: pointer;
+            border-radius: 5px;
+        }
+        .copy-button:hover {
+            background-color: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <h1>Dynamic SQL Generator</h1>
+
+    <div class="container">
+        <!-- Step 1: Form for table name and fields -->
+        <div class="section-box" id="structureSection">
+            <h2>Step 1: Define Table Structure</h2>
+            <form id="dynamicForm">
+                <label for="table_name">Table Name:</label>
+                <input type="text" id="table_name" name="table_name" placeholder="Enter table name" required>
+
+                <h3>Fields</h3>
+                <div id="fieldsContainer">
+                    <!-- Initial input fields will be placed here -->
+                </div>
+                <button type="button" id="addFieldBtn">Add Field</button>
+                <br><br>
+                <button type="submit">Proceed to Enter Values</button>
+            </form>
+        </div>
+
+        <!-- Step 2: Section for entering values -->
+        <div class="section-box" id="valueSection">
+            <h2>Step 2: Enter Values for Fields</h2>
+            <form id="valueForm">
+                <div id="valuesContainer">
+                    <!-- Dynamic value input fields will be generated here -->
+                </div>
+                <button type="submit">Generate SQL Statement</button>
+            </form>
+        </div>
+
+        <h2>Generated SQL Query:</h2>
+        <div class="sql-box" id="sqlBox">
+            <pre id="sqlOutput"></pre>
+            <button class="copy-button" id="copyBtn">Copy</button>
+        </div>
+    </div>
+
+    <script>
+        const fieldsContainer = document.getElementById('fieldsContainer');
+        const valuesContainer = document.getElementById('valuesContainer');
+        const sqlOutput = document.getElementById('sqlOutput');
+        const structureSection = document.getElementById('structureSection');
+        const valueSection = document.getElementById('valueSection');
+        const tableNameInput = document.getElementById('table_name');
+        const copyBtn = document.getElementById('copyBtn');
+        const sqlBox = document.getElementById('sqlBox');
+
+        let fieldDefinitions = [];  // Array to store fields with types
+
+        // Initially hide the SQL box until there's content
+        sqlBox.style.display = 'none';
+
+        // Function to add a new field input block
+        function addField() {
+            const fieldDiv = document.createElement('div');
+            fieldDiv.classList.add('field');
+
+            const labelInput = document.createElement('input');
+            labelInput.type = 'text';
+            labelInput.placeholder = 'Column Name';
+            labelInput.classList.add('column_name');
+            labelInput.required = true;
+
+            const valueTypeSelect = document.createElement('select');
+            valueTypeSelect.classList.add('value_type');
+            valueTypeSelect.required = true;
+            
+            // Add select options for value types
+            const valueTypes = ['Text', 'Number', 'Date', 'Boolean'];
+            valueTypes.forEach(type => {
+                const option = document.createElement('option');
+                option.value = type.toLowerCase();
+                option.textContent = type;
+                valueTypeSelect.appendChild(option);
+            });
+
+            const removeBtn = document.createElement('button');
+            removeBtn.type = 'button';
+            removeBtn.textContent = 'Remove Field';
+            removeBtn.onclick = function () {
+                fieldsContainer.removeChild(fieldDiv);
+            };
+
+            fieldDiv.appendChild(labelInput);
+            fieldDiv.appendChild(valueTypeSelect);
+            fieldDiv.appendChild(removeBtn);
+            fieldsContainer.appendChild(fieldDiv);
+        }
+
+        // Add initial field when the page loads
+        window.onload = addField;
+
+        // Add a new field when "Add Field" is clicked
+        document.getElementById('addFieldBtn').addEventListener('click', addField);
+
+        // Proceed to Step 2: Enter values after defining fields
+        document.getElementById('dynamicForm').addEventListener('submit', function (event) {
+            event.preventDefault();
+
+            const tableName = tableNameInput.value.trim();
+            if (!tableName) {
+                sqlOutput.textContent = 'Please provide a table name.';
+                sqlBox.style.display = 'none';
+                return;
+            }
+
+            let columns = [];
+            fieldDefinitions = [];
+
+            const columnNames = document.querySelectorAll('.column_name');
+            const valueTypes = document.querySelectorAll('.value_type');
+
+            columnNames.forEach((input, index) => {
+                const columnName = input.value.trim();
+                const valueType = valueTypes[index].value;
+
+                if (columnName) {
+                    columns.push(columnName);
+                    fieldDefinitions.push({ columnName, valueType });
+                }
+            });
+
+            if (columns.length === 0) {
+                sqlOutput.textContent = 'No valid fields to proceed!';
+                sqlBox.style.display = 'none';
+                return;
+            }
+
+            // Move to Step 2: Generate value input fields based on selected columns
+            structureSection.style.display = 'none';
+            valueSection.style.display = 'block';
+
+            // Generate value input fields
+            valuesContainer.innerHTML = '';
+            fieldDefinitions.forEach(field => {
+                const valueDiv = document.createElement('div');
+                valueDiv.classList.add('value-section');
+
+                const label = document.createElement('label');
+                label.textContent = `Value for ${field.columnName} (${field.valueType}):`;
+
+                const valueInput = document.createElement('input');
+                valueInput.type = field.valueType === 'number' ? 'number' : 'text';
+                valueInput.placeholder = `Enter ${field.valueType}`;
+                valueInput.classList.add('column_value');
+                valueInput.dataset.columnName = field.columnName; // Store column name in data attribute
+                valueInput.dataset.valueType = field.valueType;   // Store value type in data attribute
+                valueInput.required = true;
+
+                valueDiv.appendChild(label);
+                valueDiv.appendChild(valueInput);
+                valuesContainer.appendChild(valueDiv);
+            });
+        });
+
+        // Generate SQL query after values are entered
+        document.getElementById('valueForm').addEventListener('submit', function (event) {
+            event.preventDefault();
+
+            const tableName = tableNameInput.value.trim();
+            let columns = [];
+            let values = [];
+
+            const valueInputs = document.querySelectorAll('.column_value');
+
+            valueInputs.forEach(input => {
+                const columnName = input.dataset.columnName;
+                const valueType = input.dataset.valueType;
+                const value = input.value.trim();
+
+                if (columnName && value) {
+                    columns.push(columnName);
+
+                    // Handle value type based on user input and value type
+                    switch (valueType) {
+                        case 'text':
+                            values.push(`'${value}'`);
+                            break;
+                        case 'number':
+                            values.push(value);
+                            break;
+                        case 'date':
+                            values.push(`'${value}'`);
+                            break;
+                        case 'boolean':
+                            values.push(value.toLowerCase() === 'true' ? 'TRUE' : 'FALSE');
+                            break;
+                        default:
+                            values.push(`'${value}'`);
+                    }
+                }
+            });
+
+            if (columns.length === 0 || values.length === 0) {
+                sqlOutput.textContent = 'No valid values to generate SQL!';
+                sqlBox.style.display = 'none';
+                return;
+            }
+
+            // Generate the SQL Insert query
+            const sqlQuery = `INSERT INTO ${tableName} (${columns.join(', ')}) VALUES (${values.join(', ')});`;
+            sqlOutput.textContent = sqlQuery;
+            sqlBox.style.display = 'block';  // Show the SQL box
+        });
+
+        // Copy SQL statement to clipboard
+        copyBtn.addEventListener('click', function () {
+            const sqlText = sqlOutput.textContent;
+            if (sqlText) {
+                navigator.clipboard.writeText(sqlText).then(() => {
+                    alert('SQL query copied to clipboard!');
+                }, (err) => {
+                    console.error('Failed to copy: ', err);
+                });
+            }
+        });
+    </script>
+</body>
+</html>
